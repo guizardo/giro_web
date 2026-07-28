@@ -35,7 +35,10 @@ export async function getApiToken(backendUrl: string, cnpj?: string): Promise<st
     cacheKey,
   });
 
-  const res = await fetch(tokenUrl, { cache: 'no-store' });
+  const res = await fetch(tokenUrl, {
+    cache: 'no-store',
+    headers: { 'X-App-Key': process.env.APP_TOKEN_KEY || '' },
+  });
 
   const rawBody = await res.text();
   let parsedBody: unknown = rawBody;
