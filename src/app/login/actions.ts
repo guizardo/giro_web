@@ -14,13 +14,14 @@ const VPS_URL = (process.env.VPS_URL || 'http://localhost:3001').replace(/\/$/, 
 
 // Flag por empresa (tag pesquisa_codigo_interno, definida no portal). Consulta o VPS
 // (/giro/empresa-config, e nao /resolve) a cada login, sem o cache do appToken.
+// envia X-App-Key como /giro/token.
 // Falha ou ausencia = false. Nunca bloqueia o login.
 async function consultaPesquisaCodigoInterno(cnpj: string): Promise<boolean> {
   if (!cnpj) return false;
   try {
     const res = await fetch(
       `${VPS_URL}/giro/empresa-config?cnpj=${encodeURIComponent(cnpj)}`,
-      { cache: 'no-store' },
+      { cache: 'no-store', headers: { 'X-App-Key': process.env.APP_TOKEN_KEY || '' } },
     );
     if (!res.ok) return false;
     const data = (await res.json()) as { pesquisa_codigo_interno?: unknown };
