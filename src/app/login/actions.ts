@@ -21,7 +21,7 @@ async function consultaPesquisaCodigoInterno(cnpj: string): Promise<boolean> {
   try {
     const res = await fetch(
       `${VPS_URL}/giro/empresa-config?cnpj=${encodeURIComponent(cnpj)}`,
-      { cache: 'no-store', headers: { 'X-App-Key': process.env.APP_TOKEN_KEY || '' } },
+      { cache: 'no-store', headers: { 'X-App-Key': process.env.APP_TOKEN_KEY || '' }, signal: AbortSignal.timeout(3000) },
     );
     if (!res.ok) return false;
     const data = (await res.json()) as { pesquisa_codigo_interno?: unknown };
