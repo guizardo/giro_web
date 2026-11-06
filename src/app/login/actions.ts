@@ -10,6 +10,26 @@ export interface LoginResult {
   device_id?: string;
 }
 
+const VPS_URL = (process.env.VPS_URL || 'http://localhost:3001').replace(/\/$/, '');
+
+// Flag por empresa (tag pesquisa_codigo_interno, definida no portal). Consulta o VPS
+// (/giro/empresa-config, e nao /resolve) a cada login, sem o cache do appToken.
+// Falha ou ausencia = false. Nunca bloqueia o login.
+async function consultaPesquisaCodigoInterno(cnpj: string): Promise<boolean> {
+  if (!cnpj) return false;
+  try {
+    const res = await fetch(
+      `${VPS_URL}/giro/empresa-config?cnpj=${encodeURIComponent(cnpj)}`,
+      { cache: 'no-store' },
+    );
+    if (!res.ok) return false;
+    const data = (await res.json()) as { pesquisa_codigo_interno?: unknown };
+    return data.pesquisa_codigo_interno === true;
+  } catch {
+    return false;
+  }
+}
+
 // Login em dois passos:
 // 1) Login do sistema — valida código+senha pessoal contra a tabela SENHA
 //    (POST /api/giro/auth/login, sem Basic Auth). Só identifica o operador
@@ -45,6 +65,8 @@ export async function login(
     return { error: 'Não foi possível conectar ao servidor da empresa.' };
   }
 
+  const pesquisaCodigoInterno = await consultaPesquisaCodigoInterno(cnpj);
+
   // 1) Login do sistema — identifica o operador
   let data: { ok: boolean; erro?: string; token?: string; codigo?: number; nome?: string; tipo?: string };
   const loginUrl = `${backendUrl}/api/giro/auth/login`;
@@ -62,7 +84,11 @@ export async function login(
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${appToken}`,
       },
-      body: JSON.stringify({ codigo, senha, device_id }),
+      body: JSON.stringify(
+        pesquisaCodigoInterno
+          ? { codigo, senha, device_id, pesquisa_codigo_interno: true }
+          : { codigo, senha, device_id },
+      ),
       cache: 'no-store',
     });
 
