@@ -283,6 +283,62 @@ export interface GiroPerdaPeriodoResponse {
   Count:    number;
 }
 
+// ── Relatório 4 — Correlação de produtos (cesta de compras) ────────────────
+// Fonte: GET /api/giro/correlacao — le CONS_PRODUTO_CORRELACAO, populada pelo
+// worker Monitor_Giro\UCorrelacaoWorker.pas via análise de coocorrência de
+// produtos no mesmo cupom (SRQNF ∪ SRQNFD ∪ NOTAF+PRODNF, janela 365 dias).
+
+// 'COMPLEMENTO' = correlação genuína (comportamento de compra real).
+// 'COMPENSACAO' = item genérico/universal (aparece em cesta grande
+// independente do produto base) mas com margem real - so informativo, a
+// PONTUACAO ja recebe penalidade continua por genericidade/margem baixa,
+// entao a ordenacao/inclusao na lista nao depende deste tipo. Ver
+// UCorrelacaoWorker.pas.
+export type GiroTipoCorrelacao = 'COMPLEMENTO' | 'COMPENSACAO';
+
+// Nota 0-100 comparativa (percentil de PONTUACAO dentro da distribuicao real
+// deste banco - "regua por cliente", ver AtualizaPercentisCliente em
+// UCorrelacaoWorker.pas). Pode vir null em linhas gravadas antes da coluna
+// existir ou de bancos que ainda nao rodaram o primeiro lote completo.
+export type GiroNotaComparativa = number | null;
+
+export interface GiroCorrelato {
+  rank:                  number;
+  id_produto_correlato:  number;
+  desc_correlato:        string;
+  cod_correlato:         string;
+  juntos:                number;
+  confianca_pct:         number;
+  alavancagem:           number;
+  margem_rs:             number;
+  // Pode vir null em linhas gravadas antes da coluna existir.
+  preco_medio:           number | null;
+  pontuacao:             number;
+  tipo_correlacao:       GiroTipoCorrelacao;
+  nota_comparativa:      GiroNotaComparativa;
+}
+
+export interface GiroCorrelacaoProduto {
+  id_produto_base: number;
+  desc_base:       string;
+  ean_base:        string;
+  pontuacao_base:  number;
+  correlatos:      GiroCorrelato[];
+}
+
+export interface GiroCorrelacaoTotais {
+  total_base: number;
+}
+
+export interface GiroCorrelacaoResponse {
+  filial:   number;
+  totais:   GiroCorrelacaoTotais;
+  dados:    GiroCorrelacaoProduto[];
+  Count:    number;
+  StartsAt: string;
+  EndsAt:   string;
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 export const CURVA_GIRO: Record<string, { label: string; color: string }> = {
