@@ -269,6 +269,62 @@ export interface GiroSimuladorCBSResponse {
   Total:          number;
 }
 
+// ── Fornecedores do Simples (crédito de CBS perdido) ──────────────────────
+// Fonte: GET /api/giro/fornecedores-simples — compras da filial no período por
+// fornecedor; com fornecedor=&for_filial= devolve os produtos daquele fornecedor.
+
+export type GiroRegimeFornecedor = 'simples' | 'mei' | 'normal';
+
+export interface GiroFornSimplesTotais {
+  fornecedores:         number;
+  fornecedores_simples: number;
+  compras_total:        number;
+  compras_simples:      number;
+  perc_compras_simples: number;
+  produtos_simples:     number;
+  credito_perdido:      number;
+}
+
+export interface GiroFornSimplesItem {
+  cod_for:          number;
+  for_filial:       number;
+  nome_for:         string;
+  fantas_for:       string;
+  crt:              number;
+  regime:           GiroRegimeFornecedor;
+  compras:          number;
+  perc_compras:     number;
+  produtos:         number;
+  ultima_compra:    string;
+  credito_integral: number;
+  credito_estimado: number;
+  credito_perdido:  number;
+}
+
+export interface GiroFornSimplesProduto {
+  id_pro:                    number;
+  pro_filial:                number;
+  produto:                   string;
+  compras:                   number;
+  qtde:                      number;
+  ultima_compra:             string;
+  cclasstrib:                string;
+  sem_cclasstrib:            boolean;
+  tratamento_cbs:            string;
+  aliquota_cbs_efetiva:      number;
+  credito_integral:          number;
+  credito_estimado:          number;
+  credito_perdido:           number;
+  alternativa_regime_normal: string | null;
+}
+
+export interface GiroFornSimplesProdutosResponse {
+  totais: GiroFornSimplesTotais;
+  dados:  GiroFornSimplesProduto[];
+  Count:  number;
+  Total:  number;
+}
+
 // ── Detalhe bruto (suporte/diagnostico) ─────────────────────────────────────
 // Fonte: GET /api/giro/produto-detalhe — dump de todos os campos de
 // CONS_GIRO_ATUAL (linha atual) + historico de CONS_GIRO_MENSAL, sem curadoria.
