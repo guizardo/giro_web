@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { GiroProdutoCLDResponse } from '@/types/giro';
+import { GiroProdutoCLDResponse, GiroSimuladorCBSItem } from '@/types/giro';
 import { qs } from '@/lib/utils';
 import { useGiroFetch } from '@/hooks/useGiroFetch';
 import { X, Loader2 } from 'lucide-react';
@@ -10,6 +10,56 @@ interface Props {
   idDadospro: number;
   codFilial:  number;
   onClose:    () => void;
+  // Quando aberto pelo Simulador CBS 2027: linha já calculada pelo
+  // /api/giro/simulador-cbs, exibida lado a lado com o CLD de hoje.
+  simulacao?: GiroSimuladorCBSItem;
+}
+
+function Comparativo2027({ s }: { s: GiroSimuladorCBSItem }) {
+  const fmt = (v: number | null) => v == null ? '—' : v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const pct = (v: number | null) => v == null ? '—' : `${fmt(v)}%`;
+  const benef: Record<string, string> = { perdeu: 'Perdeu benefício', ganhou: 'Ganhou benefício', sem_mudanca: 'Sem mudança' };
+  const linhas: [string, string, string, boolean?][] = [
+    ['Tributo federal', 'PIS + COFINS', `CBS ${pct(s.aliquota_cbs_efetiva)}`],
+    ['Débito', '—', fmt(s.cbs_debito)],
+    ['Crédito (última NF)', '—', fmt(s.cbs_credito)],
+    ['A pagar', fmt(s.pis_cofins_pagar), fmt(s.cbs_pagar)],
+    ['Custo CLD', fmt(s.custo_cld_hoje), fmt(s.custo_cld_2027)],
+    ['Margem CLD (preço atual)', pct(s.margem_hoje), pct(s.margem_2027), s.margem_2027 < s.margem_hoje - 0.005],
+    ['Preço', fmt(s.preco), s.preco_sugerido != null ? `${fmt(s.preco_sugerido)} (sugerido)` : '—'],
+  ];
+  return (
+    <div className="rounded-lg border border-indigo-200 p-3">
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-xs font-semibold text-indigo-700">Simulação CBS 2027</p>
+        <p className="text-[10px] text-muted-foreground">
+          {s.sem_cclasstrib
+            ? 'sem cClassTrib · alíquota cheia'
+            : `cClassTrib ${s.cclasstrib.slice(0, 3)}.${s.cclasstrib.slice(3)} · ${s.tratamento_cbs}${s.cclasstrib_do_ncm ? ' (NCM)' : ''}`}
+          {' · '}{benef[s.beneficio]}
+          {s.fornecedor_simples && ' · fornecedor do Simples'}
+        </p>
+      </div>
+      <table className="w-full text-xs">
+        <thead>
+          <tr className="text-muted-foreground">
+            <th className="text-left font-medium py-1"></th>
+            <th className="text-right font-medium py-1">Hoje</th>
+            <th className="text-right font-medium py-1">2027</th>
+          </tr>
+        </thead>
+        <tbody>
+          {linhas.map(([label, hoje, futuro, alerta]) => (
+            <tr key={label} className="border-t">
+              <td className="py-1 text-muted-foreground">{label}</td>
+              <td className="py-1 text-right font-mono">{hoje}</td>
+              <td className={`py-1 text-right font-mono ${alerta ? 'text-red-600 font-semibold' : ''}`}>{futuro}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 }
 
 const fmt2 = (v: number) =>
@@ -31,7 +81,7 @@ function Bloco({ titulo, linhas }: { titulo: string; linhas: [string, string][] 
   );
 }
 
-export default function GiroProdutoCLDModal({ idDadospro, codFilial, onClose }: Props) {
+export default function GiroProdutoCLDModal({ idDadospro, codFilial, onClose, simulacao }: Props) {
   useEffect(() => {
     const onEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', onEsc);
@@ -99,6 +149,18 @@ export default function GiroProdutoCLDModal({ idDadospro, codFilial, onClose }: 
                   <p className="text-sm font-bold">{fmt2(cld.markup_cld)}%</p>
                 </div>
               </div>
+
+              {simulacao && (
+                <>
+                  <Comparativo2027 s={simulacao} />
+                  {Math.abs(simulacao.margem_hoje - cld.margem_cld) > 0.01 && (
+                    <p className="text-[11px] text-amber-700">
+                      Margem de hoje no simulador ({fmt2(simulacao.margem_hoje)}%) difere do CLD ({fmt2(cld.margem_cld)}%):
+                      os dados do produto mudaram desde o cálculo da lista.
+                    </p>
+                  )}
+                </>
+              )}
 
               {/* Preço / Custo */}
               <div className="grid grid-cols-2 gap-3">

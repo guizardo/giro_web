@@ -123,7 +123,7 @@ export default function GiroSimuladorCBSView({ filialAtual }: Props) {
   const [showFilters, setShowFilters]   = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>('');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
-  const [cldSelecionado, setCldSelecionado] = useState<{ idDadospro: number; codFilial: number } | null>(null);
+  const [cldSelecionado, setCldSelecionado] = useState<GiroSimuladorCBSItem | null>(null);
   const [exportando, setExportando] = useState(false);
 
   const consolidado = filialAtual === '0';
@@ -442,8 +442,8 @@ export default function GiroSimuladorCBSView({ filialAtual }: Props) {
                   </td>
                   <td className="py-1.5 px-2 border-b text-center">
                     <button
-                      onClick={() => setCldSelecionado({ idDadospro: item.id_dadospro, codFilial: item.cod_filial })}
-                      title="Ver cálculo CLD atual do produto"
+                      onClick={() => setCldSelecionado(item)}
+                      title="Ver cálculo CLD de hoje comparado com 2027"
                       className="inline-flex items-center justify-center h-6 w-6 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
                     >
                       <Calculator className="h-3.5 w-3.5" />
@@ -465,8 +465,9 @@ export default function GiroSimuladorCBSView({ filialAtual }: Props) {
 
       {cldSelecionado && (
         <GiroProdutoCLDModal
-          idDadospro={cldSelecionado.idDadospro}
-          codFilial={cldSelecionado.codFilial}
+          idDadospro={cldSelecionado.id_dadospro}
+          codFilial={cldSelecionado.cod_filial}
+          simulacao={cldSelecionado}
           onClose={() => setCldSelecionado(null)}
         />
       )}
