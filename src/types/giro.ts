@@ -194,6 +194,81 @@ export interface GiroProdutoCLDResponse {
   EndsAt:   string;
 }
 
+// ── Simulador de preço com CBS 2027 ───────────────────────────────────────
+// Fonte: GET /api/giro/simulador-cbs — CLD de todos os produtos da filial com a
+// CBS no lugar de PIS/COFINS (Delphi: UCalculoCLD.CalculaCBS2027).
+
+export type GiroBeneficioCBS = 'perdeu' | 'ganhou' | 'sem_mudanca';
+
+export interface GiroSimuladorCBSParametros {
+  aliquota_cbs:    number;
+  modo:            'fora' | 'dentro';
+  credito_simples: number;
+  margem_alvo:     number | null;
+}
+
+export interface GiroSimuladorCBSTotais {
+  regime_simples:           boolean;
+  produtos:                 number;
+  perdem_margem:            number;
+  perderam_beneficio:       number;
+  ganharam_beneficio:       number;
+  sem_cclasstrib:           number;
+  fornecedor_simples:       number;
+  com_preco_sugerido:       number;
+  impacto_mensal:           number;
+  reajuste_medio_ponderado: number | null;
+}
+
+export interface GiroSimuladorCBSItem {
+  id_dadospro:          number;
+  cod_filial:           number;
+  cod_pro:              string;
+  produto:              string;
+  secao:                string;
+  grupo:                string;
+  curva:                string;
+  venda_30d:            number;
+  preco:                number;
+  custo:                number;
+  cclasstrib:           string;
+  cst_ibs_cbs:          string;
+  sem_cclasstrib:       boolean;
+  cclasstrib_do_ncm:    boolean;
+  tratamento_cbs:       string;
+  reducao_cbs:          number;
+  aliquota_cbs_efetiva: number;
+  custo_cld_hoje:       number;
+  margem_hoje:          number;
+  pis_cofins_pagar:     number;
+  carga_federal_hoje:   number;
+  cbs_debito:           number;
+  cbs_credito:          number;
+  cbs_pagar:            number;
+  custo_cld_2027:       number;
+  margem_2027:          number;
+  preco_sugerido:       number | null;
+  variacao_valor:       number | null;
+  variacao_perc:        number | null;
+  impacto_mensal:       number;
+  beneficio:            GiroBeneficioCBS;
+  crt_fornecedor:       number;
+  fornecedor_simples:   boolean;
+  tem_nf_entrada:       boolean;
+}
+
+// Campos fora de dados/totais (parametros, regime) chegam em todas as paginas.
+export interface GiroSimuladorCBSResponse {
+  filial:         number;
+  parametros:     GiroSimuladorCBSParametros;
+  crt_filial:     number;
+  regime_simples: boolean;
+  totais:         GiroSimuladorCBSTotais;
+  dados:          GiroSimuladorCBSItem[];
+  Count:          number;
+  Total:          number;
+}
+
 // ── Detalhe bruto (suporte/diagnostico) ─────────────────────────────────────
 // Fonte: GET /api/giro/produto-detalhe — dump de todos os campos de
 // CONS_GIRO_ATUAL (linha atual) + historico de CONS_GIRO_MENSAL, sem curadoria.

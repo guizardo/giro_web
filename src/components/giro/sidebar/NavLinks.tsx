@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { Package, TrendingDown, Zap, AlertTriangle, CalendarSearch, Building2, Link2 } from 'lucide-react';
+import { Package, TrendingDown, Zap, AlertTriangle, CalendarSearch, Building2, Link2, Calculator } from 'lucide-react';
 
 const links = [
   { href: '/estoque',                   label: 'Visão Geral',      icon: Package },
@@ -13,6 +13,7 @@ const links = [
   { href: '/estoque/perda',             label: 'Perda Desc.',      icon: AlertTriangle },
   { href: '/estoque/perda-periodo',     label: 'Perda p/ Período', icon: CalendarSearch },
   { href: '/estoque/correlacao',        label: 'Correlação',       icon: Link2 },
+  { href: '/estoque/simulador-cbs',     label: 'Simulador CBS 2027', icon: Calculator },
 ];
 
 export default function NavLinks() {
