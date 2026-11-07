@@ -2,7 +2,7 @@
 const nextConfig = {
   output: 'standalone',
   // Permite acessar o dev server (assets /_next/*) pela rede local, não só localhost.
-  allowedDevOrigins: ['10.1.4.29'],
+  allowedDevOrigins: ['10.1.4.29', '10.1.4.222'],
 };
 
 // Desabilita verificação de certificado TLS apenas para backends em rede

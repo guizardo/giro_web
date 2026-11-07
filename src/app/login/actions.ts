@@ -2,6 +2,7 @@
 
 import { cookies } from 'next/headers';
 import { getApiToken } from '@/lib/apiToken';
+import { reportarLoginLocal } from '@/lib/reportLogin';
 
 export interface LoginResult {
   error?:     string;
@@ -131,6 +132,8 @@ export async function login(
   // Substitui o appToken genérico: token agora é pessoal + vinculado ao dispositivo.
   const userToken = data.token as string;
   if (!userToken) return { error: 'Servidor não emitiu token de sessão.' };
+
+  await reportarLoginLocal(cnpj, data.codigo, data.nome, device_id);
 
   const expiraEm = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString();
   const userInfo = JSON.stringify({
