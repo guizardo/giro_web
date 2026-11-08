@@ -7,6 +7,7 @@ import BackendGate from '@/components/giro/BackendGate';
 import LogoutButton from '@/components/giro/sidebar/LogoutButton';
 import { BarChart3 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
+import { simuladorReformaLiberado } from '@/lib/empresaFlags';
 import { GiroFilial, GiroFiliaisResponse } from '@/types/giro';
 
 async function getFiliais(): Promise<GiroFilial[]> {
@@ -30,6 +31,7 @@ export default async function GiroLayout({ children }: { children: React.ReactNo
 
   const defaultFilial = filiais.length > 0 ? String(filiais[0].codigo) : '1';
   const filialAtual   = cookieStore.get('giro_filial')?.value ?? defaultFilial;
+  const simuladorReforma = simuladorReformaLiberado();
 
   const labelAtual = filialAtual === '0'
     ? 'Consolidado'
@@ -70,13 +72,13 @@ export default async function GiroLayout({ children }: { children: React.ReactNo
         <SidebarShell
           brand={brand}
           filial={filialNode}
-          nav={<NavLinks />}
+          nav={<NavLinks simuladorReforma={simuladorReforma} />}
           footer={footer}
         />
 
         {/* ── Área de conteúdo ──────────────────────────────────────────── */}
         <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-          <MobileHeader filiais={filiais} filialAtual={filialAtual} labelAtual={labelAtual} />
+          <MobileHeader filiais={filiais} filialAtual={filialAtual} labelAtual={labelAtual} simuladorReforma={simuladorReforma} />
           <main className="flex-1 overflow-hidden">
             {children}
           </main>

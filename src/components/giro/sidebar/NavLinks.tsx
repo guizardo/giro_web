@@ -13,16 +13,22 @@ const links = [
   { href: '/estoque/perda',             label: 'Perda Desc.',      icon: AlertTriangle },
   { href: '/estoque/perda-periodo',     label: 'Perda p/ Período', icon: CalendarSearch },
   { href: '/estoque/correlacao',        label: 'Correlação',       icon: Link2 },
-  { href: '/estoque/simulador-cbs',     label: 'Simulador CBS 2027', icon: Calculator },
+];
+
+// Telas do Simulador da Reforma — so aparecem quando a empresa tem a opcao
+// habilitada no portal admin (empresas.simulador_reforma).
+const linksReforma = [
+  { href: '/estoque/simulador-cbs',        label: 'Simulador CBS 2027',      icon: Calculator },
   { href: '/estoque/fornecedores-simples', label: 'Fornecedores do Simples', icon: Store },
 ];
 
-export default function NavLinks() {
+export default function NavLinks({ simuladorReforma = false }: { simuladorReforma?: boolean }) {
   const pathname = usePathname();
+  const itens = simuladorReforma ? [...links, ...linksReforma] : links;
 
   return (
     <nav className="flex flex-col gap-1 px-3">
-      {links.map(({ href, label, icon: Icon }) => {
+      {itens.map(({ href, label, icon: Icon }) => {
         const active = pathname === href || (href !== '/estoque' && pathname.startsWith(href + '/'));
         return (
           <Link

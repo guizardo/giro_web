@@ -13,22 +13,31 @@ export interface LoginResult {
 
 const VPS_URL = (process.env.VPS_URL || 'http://localhost:3001').replace(/\/$/, '');
 
-// Flag por empresa (tag pesquisa_codigo_interno, definida no portal). Consulta o VPS
-// (/giro/empresa-config, e nao /resolve) a cada login, sem o cache do appToken.
-// envia X-App-Key como /giro/token.
+interface EmpresaConfigFlags {
+  pesquisaCodigoInterno: boolean;
+  simuladorReforma:      boolean;
+}
+
+// Flags por empresa definidas no portal (tags pesquisa_codigo_interno e
+// simulador_reforma). Consulta o VPS (/giro/empresa-config, e nao /resolve) a cada
+// login, sem o cache do appToken. Envia X-App-Key como /giro/token.
 // Falha ou ausencia = false. Nunca bloqueia o login.
-async function consultaPesquisaCodigoInterno(cnpj: string): Promise<boolean> {
-  if (!cnpj) return false;
+async function consultaEmpresaConfig(cnpj: string): Promise<EmpresaConfigFlags> {
+  const nenhuma: EmpresaConfigFlags = { pesquisaCodigoInterno: false, simuladorReforma: false };
+  if (!cnpj) return nenhuma;
   try {
     const res = await fetch(
       `${VPS_URL}/giro/empresa-config?cnpj=${encodeURIComponent(cnpj)}`,
       { cache: 'no-store', headers: { 'X-App-Key': process.env.APP_TOKEN_KEY || '' }, signal: AbortSignal.timeout(3000) },
     );
-    if (!res.ok) return false;
-    const data = (await res.json()) as { pesquisa_codigo_interno?: unknown };
-    return data.pesquisa_codigo_interno === true;
+    if (!res.ok) return nenhuma;
+    const data = (await res.json()) as { pesquisa_codigo_interno?: unknown; simulador_reforma?: unknown };
+    return {
+      pesquisaCodigoInterno: data.pesquisa_codigo_interno === true,
+      simuladorReforma:      data.simulador_reforma === true,
+    };
   } catch {
-    return false;
+    return nenhuma;
   }
 }
 
@@ -67,7 +76,7 @@ export async function login(
     return { error: 'Não foi possível conectar ao servidor da empresa.' };
   }
 
-  const pesquisaCodigoInterno = await consultaPesquisaCodigoInterno(cnpj);
+  const { pesquisaCodigoInterno, simuladorReforma } = await consultaEmpresaConfig(cnpj);
 
   // 1) Login do sistema — identifica o operador
   let data: { ok: boolean; erro?: string; token?: string; codigo?: number; nome?: string; tipo?: string };
@@ -144,6 +153,7 @@ export async function login(
     cnpj,
     device_id,
     token:  userToken,
+    simulador_reforma: simuladorReforma, // lido por lib/empresaFlags.ts
   });
 
   const cookieStore = cookies();

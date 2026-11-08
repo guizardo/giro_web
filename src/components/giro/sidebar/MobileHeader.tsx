@@ -12,9 +12,10 @@ interface Props {
   filiais:     GiroFilial[];
   filialAtual: string;
   labelAtual:  string;
+  simuladorReforma?: boolean;
 }
 
-export default function MobileHeader({ filiais, filialAtual, labelAtual }: Props) {
+export default function MobileHeader({ filiais, filialAtual, labelAtual, simuladorReforma = false }: Props) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -75,7 +76,7 @@ export default function MobileHeader({ filiais, filialAtual, labelAtual }: Props
         )}
 
         <div className="flex-1 overflow-y-auto py-3" onClick={() => setOpen(false)}>
-          <NavLinks />
+          <NavLinks simuladorReforma={simuladorReforma} />
         </div>
 
         <div className="border-t px-4 py-3">
