@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { GiroProdutoCLDResponse, GiroSimuladorCBSItem } from '@/types/giro';
+import { GiroProdutoCLD, GiroProdutoCLDResponse, GiroSimuladorCBSItem } from '@/types/giro';
 import { qs } from '@/lib/utils';
 import { useGiroFetch } from '@/hooks/useGiroFetch';
 import { X, Loader2 } from 'lucide-react';
@@ -15,15 +15,32 @@ interface Props {
   simulacao?: GiroSimuladorCBSItem;
 }
 
-function Comparativo2027({ s }: { s: GiroSimuladorCBSItem }) {
+// Texto do CST de PIS/COFINS de hoje (ex.: "01" ou "PIS 01 · COFINS 06" quando diferem).
+function textoCstPisCofins(c: GiroProdutoCLD): string {
+  const pis = (c.aliquotas_custos.cst_pis || '').trim();
+  const cof = (c.aliquotas_custos.cst_cofins || '').trim();
+  if (!pis && !cof) return 'sem CST';
+  return pis === cof ? `CST ${pis}` : `PIS ${pis || '—'} · COFINS ${cof || '—'}`;
+}
+
+// Coluna "Hoje" vem do próprio CLD do modal (débitos/créditos de PIS+COFINS da
+// última NF); coluna "2027" vem da linha calculada pelo simulador.
+function Comparativo2027({ s, cld }: { s: GiroSimuladorCBSItem; cld: GiroProdutoCLD }) {
   const fmt = (v: number | null) => v == null ? '—' : v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const pct = (v: number | null) => v == null ? '—' : `${fmt(v)}%`;
   const benef: Record<string, string> = { perdeu: 'Perdeu benefício', ganhou: 'Ganhou benefício', sem_mudanca: 'Sem mudança' };
+  const a = cld.aliquotas_custos;
+  const debHoje  = cld.impostos_debitos.pis  + cld.impostos_debitos.cofins;
+  const credHoje = cld.impostos_creditos.pis + cld.impostos_creditos.cofins;
+  const pagHoje  = cld.impostos_a_pagar.pis  + cld.impostos_a_pagar.cofins;
   const linhas: [string, string, string, boolean?][] = [
     ['Tributo federal', 'PIS + COFINS', `CBS ${pct(s.aliquota_cbs_efetiva)}`],
-    ['Débito', '—', fmt(s.cbs_debito)],
-    ['Crédito (última NF)', '—', fmt(s.cbs_credito)],
-    ['A pagar', fmt(s.pis_cofins_pagar), fmt(s.cbs_pagar)],
+    ['Situação', textoCstPisCofins(cld),
+      s.sem_cclasstrib ? 'sem cClassTrib (000.001)' : `cClassTrib ${s.cclasstrib.slice(0, 3)}.${s.cclasstrib.slice(3)}`],
+    ['Alíquota', `${pct(a.pis)} + ${pct(a.cofins)}`, pct(s.aliquota_cbs_efetiva)],
+    ['Débito', fmt(debHoje), fmt(s.cbs_debito)],
+    ['Crédito (última NF)', fmt(credHoje), fmt(s.cbs_credito)],
+    ['A pagar', fmt(pagHoje), fmt(s.cbs_pagar)],
     ['Custo CLD', fmt(s.custo_cld_hoje), fmt(s.custo_cld_2027)],
     ['Margem CLD (preço atual)', pct(s.margem_hoje), pct(s.margem_2027), s.margem_2027 < s.margem_hoje - 0.005],
     ['Preço', fmt(s.preco), s.preco_sugerido != null ? `${fmt(s.preco_sugerido)} (sugerido)` : '—'],
@@ -152,7 +169,7 @@ export default function GiroProdutoCLDModal({ idDadospro, codFilial, onClose, si
 
               {simulacao && (
                 <>
-                  <Comparativo2027 s={simulacao} />
+                  <Comparativo2027 s={simulacao} cld={cld} />
                   {Math.abs(simulacao.margem_hoje - cld.margem_cld) > 0.01 && (
                     <p className="text-[11px] text-amber-700">
                       Margem de hoje no simulador ({fmt2(simulacao.margem_hoje)}%) difere do CLD ({fmt2(cld.margem_cld)}%):
@@ -174,12 +191,21 @@ export default function GiroProdutoCLDModal({ idDadospro, codFilial, onClose, si
                 </div>
               </div>
 
-              {/* CST ICMS */}
-              <div className="rounded-lg border p-3">
-                <p className="text-xs font-semibold text-muted-foreground mb-2">CST ICMS</p>
-                <div className="space-y-1 text-xs">
-                  <div className="flex justify-between"><span className="text-muted-foreground">XML (entrada)</span><span className="font-medium">{cld.cst_desc_entrada || '—'}</span></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground">Saída</span><span className="font-medium">{cld.cst_desc_saida || '—'}</span></div>
+              {/* CST ICMS e PIS/COFINS (situação atual) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="rounded-lg border p-3">
+                  <p className="text-xs font-semibold text-muted-foreground mb-2">CST ICMS</p>
+                  <div className="space-y-1 text-xs">
+                    <div className="flex justify-between gap-2"><span className="text-muted-foreground">XML (entrada)</span><span className="font-medium text-right">{cld.cst_desc_entrada || '—'}</span></div>
+                    <div className="flex justify-between gap-2"><span className="text-muted-foreground">Saída</span><span className="font-medium text-right">{cld.cst_desc_saida || '—'}</span></div>
+                  </div>
+                </div>
+                <div className="rounded-lg border p-3">
+                  <p className="text-xs font-semibold text-muted-foreground mb-2">CST PIS / COFINS (saída)</p>
+                  <div className="space-y-1 text-xs">
+                    <div className="flex justify-between gap-2"><span className="text-muted-foreground">PIS</span><span className="font-medium font-mono">{cld.aliquotas_custos.cst_pis || '—'} · {fmt2(cld.aliquotas_custos.pis)}%</span></div>
+                    <div className="flex justify-between gap-2"><span className="text-muted-foreground">COFINS</span><span className="font-medium font-mono">{cld.aliquotas_custos.cst_cofins || '—'} · {fmt2(cld.aliquotas_custos.cofins)}%</span></div>
+                  </div>
                 </div>
               </div>
 
