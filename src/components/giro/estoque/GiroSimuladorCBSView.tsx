@@ -30,12 +30,16 @@ interface Parametros {
   modo:       'fora' | 'dentro';
   credSimples: string;
   margemAlvo: string;
+  // Filial no Simples puro: alíquota efetiva do DAS (vazio = cadastro de filiais)
+  // e % da partilha do DAS que vira CBS+IBS em 2027 (Anexo I faixas 1-5: 15,33 + 0,17).
+  aliqDas:    string;
+  partilha:   string;
 }
 
 interface Props { filialAtual: string }
 
 const PAGE_SIZE = 1000; // cada página recalcula a filial no backend: páginas grandes = menos recálculos
-const PARAM_PADRAO: Parametros = { aliquota: '11,3', modo: 'fora', credSimples: '1,0', margemAlvo: '' };
+const PARAM_PADRAO: Parametros = { aliquota: '11,3', modo: 'fora', credSimples: '1,0', margemAlvo: '', aliqDas: '', partilha: '15,5' };
 
 const fmt2 = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtPct = (v: number) => `${fmt2(v)}%`;
@@ -138,6 +142,8 @@ export default function GiroSimuladorCBSView({ filialAtual }: Props) {
     modo:            param.modo,
     credito_simples: toNum(param.credSimples) || undefined,
     margem_alvo:     toNum(param.margemAlvo) || undefined,
+    aliq_das:        toNum(param.aliqDas) || undefined,
+    partilha_cbs:    toNum(param.partilha) || undefined,
     secao:           secao || undefined,
     grupo:           grupo || undefined,
     curva:           curva || undefined,
@@ -207,20 +213,24 @@ export default function GiroSimuladorCBSView({ filialAtual }: Props) {
     { label: 'Produtos', value: t ? String(t.produtos) : '—', color: 'text-foreground' },
     { label: 'Perdem margem', value: t ? String(t.perdem_margem) : '—', color: 'text-red-600',
       onClick: () => setSoPerdeMargem(v => !v), ativo: soPerdeMargem },
-    { label: 'Perderam benefício', value: t ? String(t.perderam_beneficio) : '—', color: 'text-red-700',
+    { label: regimeSimples ? 'Monofásicos (perdem segregação)' : 'Perderam benefício',
+      value: t ? String(t.perderam_beneficio) : '—', color: 'text-red-700',
       onClick: () => setBeneficio(b => b === 'perdeu' ? '' : 'perdeu'), ativo: beneficio === 'perdeu' },
-    { label: 'Ganharam benefício', value: t ? String(t.ganharam_beneficio) : '—', color: 'text-green-700',
-      onClick: () => setBeneficio(b => b === 'ganhou' ? '' : 'ganhou'), ativo: beneficio === 'ganhou' },
-    { label: 'Sem cClassTrib (alíq. cheia)', value: t ? String(t.sem_cclasstrib) : '—', color: 'text-amber-600',
-      onClick: () => setSoSemClass(v => !v), ativo: soSemClass },
-    { label: 'Comprados de Simples', value: t ? String(t.fornecedor_simples) : '—', color: 'text-indigo-600' },
+    // No Simples puro a redução/cesta básica não reduz o DAS: não há ganho nem cClassTrib a conferir
+    ...(!regimeSimples ? [
+      { label: 'Ganharam benefício', value: t ? String(t.ganharam_beneficio) : '—', color: 'text-green-700',
+        onClick: () => setBeneficio(b => b === 'ganhou' ? '' : 'ganhou'), ativo: beneficio === 'ganhou' },
+      { label: 'Sem cClassTrib (alíq. cheia)', value: t ? String(t.sem_cclasstrib) : '—', color: 'text-amber-600',
+        onClick: () => setSoSemClass(v => !v), ativo: soSemClass },
+      { label: 'Comprados de Simples', value: t ? String(t.fornecedor_simples) : '—', color: 'text-indigo-600' },
+    ] : []),
     { label: 'Impacto mensal no lucro', value: t ? `R$ ${fmt2(t.impacto_mensal)}` : '—',
       color: t && t.impacto_mensal < 0 ? 'text-red-600' : 'text-green-700' },
-    ...(!regimeSimples ? [{ label: 'Reajuste médio (pond. venda)',
-      value: t?.reajuste_medio_ponderado != null ? fmtPct(t.reajuste_medio_ponderado) : '—', color: 'text-foreground' }] : []),
+    { label: 'Reajuste médio (pond. venda)',
+      value: t?.reajuste_medio_ponderado != null ? fmtPct(t.reajuste_medio_ponderado) : '—', color: 'text-foreground' },
   ];
 
-  const colSpan = regimeSimples ? 12 : 15;
+  const colSpan = 15;
 
   return (
     <div className="h-full flex flex-col gap-3 p-4 overflow-hidden">
@@ -229,36 +239,52 @@ export default function GiroSimuladorCBSView({ filialAtual }: Props) {
         <p className="text-muted-foreground text-sm">
           {loading ? 'Calculando...' : `${items.length} de ${t?.produtos ?? 0} produtos`}
           {' · '}Filial {filialAtual}
-          {' · '}PIS/COFINS substituídos pela CBS de {param.aliquota}%, cálculo por {param.modo}
+          {' · '}{regimeSimples
+            ? 'Simples Nacional (DAS): PIS/COFINS da partilha viram CBS+IBS, sem segregação de monofásicos'
+            : `PIS/COFINS substituídos pela CBS de ${param.aliquota}%, cálculo por ${param.modo}`}
         </p>
       </div>
 
       {/* Parâmetros da simulação */}
       <div className="shrink-0 rounded-lg border bg-muted/30 p-3 flex flex-wrap items-end gap-3">
-        <div className="flex flex-col gap-1">
-          <span className="text-xs text-muted-foreground">Alíquota CBS (%)</span>
-          <Input value={paramEdit.aliquota} onChange={e => setParamEdit(p => ({ ...p, aliquota: e.target.value }))} className="w-24 h-9 bg-background" />
-        </div>
-        <div className="flex flex-col gap-1">
-          <span className="text-xs text-muted-foreground">Cálculo</span>
-          <Select value={paramEdit.modo} onValueChange={(v) => setParamEdit(p => ({ ...p, modo: v === 'dentro' ? 'dentro' : 'fora' }))}>
-            <SelectTrigger className="w-36 h-9 bg-background"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="fora">Por fora (LC 214)</SelectItem>
-              <SelectItem value="dentro">Por dentro</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex flex-col gap-1">
-          <span className="text-xs text-muted-foreground" title="Crédito de CBS sobre o valor da compra quando o fornecedor é do Simples (CBS paga no DAS)">Crédito fornec. Simples (%)</span>
-          <Input value={paramEdit.credSimples} onChange={e => setParamEdit(p => ({ ...p, credSimples: e.target.value }))} className="w-24 h-9 bg-background" />
-        </div>
-        {!regimeSimples && (
-          <div className="flex flex-col gap-1">
-            <span className="text-xs text-muted-foreground">Margem-alvo (%)</span>
-            <Input placeholder="manter atual" value={paramEdit.margemAlvo} onChange={e => setParamEdit(p => ({ ...p, margemAlvo: e.target.value }))} className="w-28 h-9 bg-background" />
-          </div>
+        {regimeSimples ? (
+          <>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground" title="Alíquota efetiva do DAS com ICMS, PIS e COFINS. Vazio = a do cadastro de filiais do Retaguarda.">Alíquota do DAS (%)</span>
+              <Input placeholder={t?.simples_aliq_cheia != null ? fmt2(t.simples_aliq_cheia) : 'do cadastro'} value={paramEdit.aliqDas}
+                onChange={e => setParamEdit(p => ({ ...p, aliqDas: e.target.value }))} className="w-28 h-9 bg-background" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground" title="Parte do DAS que vira CBS + IBS em 2027 (Anexo I, faixas 1 a 5: 15,33% + 0,17%; faixa 6: 34,02%)">Partilha CBS+IBS no DAS (%)</span>
+              <Input value={paramEdit.partilha} onChange={e => setParamEdit(p => ({ ...p, partilha: e.target.value }))} className="w-24 h-9 bg-background" />
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground">Alíquota CBS (%)</span>
+              <Input value={paramEdit.aliquota} onChange={e => setParamEdit(p => ({ ...p, aliquota: e.target.value }))} className="w-24 h-9 bg-background" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground">Cálculo</span>
+              <Select value={paramEdit.modo} onValueChange={(v) => setParamEdit(p => ({ ...p, modo: v === 'dentro' ? 'dentro' : 'fora' }))}>
+                <SelectTrigger className="w-36 h-9 bg-background"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="fora">Por fora (LC 214)</SelectItem>
+                  <SelectItem value="dentro">Por dentro</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground" title="Crédito de CBS sobre o valor da compra quando o fornecedor é do Simples (CBS paga no DAS)">Crédito fornec. Simples (%)</span>
+              <Input value={paramEdit.credSimples} onChange={e => setParamEdit(p => ({ ...p, credSimples: e.target.value }))} className="w-24 h-9 bg-background" />
+            </div>
+          </>
         )}
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-muted-foreground">Margem-alvo (%)</span>
+          <Input placeholder="manter atual" value={paramEdit.margemAlvo} onChange={e => setParamEdit(p => ({ ...p, margemAlvo: e.target.value }))} className="w-28 h-9 bg-background" />
+        </div>
         <button
           onClick={() => setParam(paramEdit)}
           disabled={loading || !paramAlterado}
@@ -275,11 +301,23 @@ export default function GiroSimuladorCBSView({ filialAtual }: Props) {
       </div>
 
       {regimeSimples && (
-        <div className="shrink-0 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-          Filial no Simples Nacional: a tela mostra só a análise de perda e ganho de benefício, sem preço sugerido.
+        <div className="shrink-0 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 space-y-0.5">
+          <p className="font-semibold">Filial no Simples Nacional (DAS) — Simples híbrido ainda não simulado.</p>
+          <p>
+            Hoje os produtos com CST de PIS/COFINS 04, 05 e 06 têm a receita segregada no PGDAS e não pagam a parte de PIS/COFINS do DAS.
+            Em 2027 essa segregação acaba: a parte de CBS+IBS ({t?.simples_partilha_cbs != null ? fmt2(t.simples_partilha_cbs) : '15,50'}% do DAS) incide sobre todos os produtos,
+            e cesta básica / redução da CBS não reduzem o DAS.
+          </p>
+          {t?.simples_aliq_cheia != null && (
+            <p className="text-amber-800">
+              Alíquotas do DAS usadas: cheia {fmt2(t.simples_aliq_cheia)}% · sem PIS/COFINS {fmt2(t.simples_aliq_sem_piscof ?? 0)}% ·
+              {' '}sem ICMS {fmt2(t.simples_aliq_sem_icms ?? 0)}% · sem ICMS e PIS/COFINS {fmt2(t.simples_aliq_sem_ambos ?? 0)}%
+              {t.simples_aliq_cheia <= 0 && ' — alíquota do DAS não cadastrada na filial: informe acima.'}
+            </p>
+          )}
         </div>
       )}
-      {!!t?.sem_cclasstrib && (
+      {!regimeSimples && !!t?.sem_cclasstrib && (
         <div className="shrink-0 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 flex items-center gap-2">
           <AlertTriangle className="h-4 w-4 shrink-0" />
           {t.sem_cclasstrib} {t.sem_cclasstrib === 1 ? 'item está' : 'itens estão'} sem cClassTrib no produto e no NCM e {t.sem_cclasstrib === 1 ? 'foi calculado' : 'foram calculados'} com alíquota cheia de CBS.
@@ -392,18 +430,16 @@ export default function GiroSimuladorCBSView({ filialAtual }: Props) {
                 <Th sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="text-left">Código</Th>
                 <Th col="produto" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="text-left min-w-[180px]">Produto</Th>
                 <Th col="curva" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="text-left">Curva</Th>
-                <Th col="aliquota_cbs" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="text-left">cClassTrib</Th>
+                <Th col="aliquota_cbs" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="text-left">{regimeSimples ? 'CST PIS/COF' : 'cClassTrib'}</Th>
                 <Th sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="text-left">Benefício</Th>
                 <Th col="venda_30d" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="text-right">Venda 30d</Th>
                 <Th col="preco" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="text-right">Preço</Th>
                 <Th col="margem_hoje" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="text-right border-l">Margem hoje</Th>
-                <Th sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="text-right">PIS+COFINS</Th>
-                <Th sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="text-right border-l">CBS a pagar</Th>
+                <Th sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="text-right">{regimeSimples ? 'PIS/COF no DAS' : 'PIS+COFINS'}</Th>
+                <Th sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="text-right border-l">{regimeSimples ? 'CBS+IBS no DAS' : 'CBS a pagar'}</Th>
                 <Th col="margem_2027" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="text-right">Margem 2027</Th>
-                {!regimeSimples && <>
-                  <Th sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="text-right border-l">Preço sugerido</Th>
-                  <Th col="variacao_perc" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="text-right">Var.</Th>
-                </>}
+                <Th sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="text-right border-l">Preço sugerido</Th>
+                <Th col="variacao_perc" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="text-right">Var.</Th>
                 <Th col="impacto_mensal" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="text-right border-l">Impacto/mês</Th>
                 <Th sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="text-center">CLD</Th>
               </tr>
@@ -421,7 +457,15 @@ export default function GiroSimuladorCBSView({ filialAtual }: Props) {
                     )}
                   </td>
                   <td className="py-1.5 px-2 border-b"><CurvaBadge curva={item.curva} /></td>
-                  <td className="py-1.5 px-2 border-b"><ClassTribCell item={item} /></td>
+                  <td className="py-1.5 px-2 border-b">
+                    {regimeSimples ? (
+                      <span className="font-mono text-[11px]" title={`DAS hoje ${fmtPct(item.aliq_das_hoje ?? 0)} → 2027 ${fmtPct(item.aliq_das_2027 ?? 0)}${item.simples_icms_st ? ' · ICMS-ST' : ''}`}>
+                        {item.cst_pis || '—'}
+                        {item.simples_monofasico && <span className="ml-1 rounded bg-red-50 border border-red-200 px-1 text-[9px] font-semibold text-red-700">MONOFÁSICO</span>}
+                        {item.simples_icms_st && <span className="ml-1 text-muted-foreground">ST</span>}
+                      </span>
+                    ) : <ClassTribCell item={item} />}
+                  </td>
                   <td className="py-1.5 px-2 border-b"><BeneficioBadge beneficio={item.beneficio} /></td>
                   <td className="py-1.5 px-2 border-b text-right font-mono">{fmt2(item.venda_30d)}</td>
                   <td className="py-1.5 px-2 border-b text-right font-mono">{fmt2(item.preco)}</td>
@@ -431,12 +475,10 @@ export default function GiroSimuladorCBSView({ filialAtual }: Props) {
                     {fmt2(item.cbs_pagar)}
                   </td>
                   <td className="py-1.5 px-2 border-b text-right"><MargemCell value={item.margem_2027} base={item.margem_hoje} /></td>
-                  {!regimeSimples && <>
-                    <td className="py-1.5 px-2 border-b text-right font-mono font-semibold border-l">{item.preco_sugerido != null ? fmt2(item.preco_sugerido) : '—'}</td>
-                    <td className={`py-1.5 px-2 border-b text-right font-mono ${(item.variacao_perc ?? 0) > 0.005 ? 'text-red-600' : (item.variacao_perc ?? 0) < -0.005 ? 'text-green-700' : ''}`}>
-                      {item.variacao_perc != null ? `${item.variacao_perc > 0 ? '+' : ''}${fmtPct(item.variacao_perc)}` : '—'}
-                    </td>
-                  </>}
+                  <td className="py-1.5 px-2 border-b text-right font-mono font-semibold border-l">{item.preco_sugerido != null ? fmt2(item.preco_sugerido) : '—'}</td>
+                  <td className={`py-1.5 px-2 border-b text-right font-mono ${(item.variacao_perc ?? 0) > 0.005 ? 'text-red-600' : (item.variacao_perc ?? 0) < -0.005 ? 'text-green-700' : ''}`}>
+                    {item.variacao_perc != null ? `${item.variacao_perc > 0 ? '+' : ''}${fmtPct(item.variacao_perc)}` : '—'}
+                  </td>
                   <td className={`py-1.5 px-2 border-b text-right font-mono border-l ${item.impacto_mensal < -0.005 ? 'text-red-600' : item.impacto_mensal > 0.005 ? 'text-green-700' : ''}`}>
                     {fmt2(item.impacto_mensal)}
                   </td>

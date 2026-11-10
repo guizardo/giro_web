@@ -218,6 +218,12 @@ export interface GiroSimuladorCBSTotais {
   com_preco_sugerido:       number;
   impacto_mensal:           number;
   reajuste_medio_ponderado: number | null;
+  // Só quando a filial é do Simples puro: alíquotas efetivas do DAS usadas (%)
+  simples_aliq_cheia?:      number;
+  simples_aliq_sem_piscof?: number;
+  simples_aliq_sem_icms?:   number;
+  simples_aliq_sem_ambos?:  number;
+  simples_partilha_cbs?:    number;
 }
 
 export interface GiroSimuladorCBSItem {
@@ -255,6 +261,12 @@ export interface GiroSimuladorCBSItem {
   crt_fornecedor:       number;
   fornecedor_simples:   boolean;
   tem_nf_entrada:       boolean;
+  // Só quando a filial é do Simples puro (margem e valores no modelo do DAS)
+  simples_monofasico?:  boolean;   // CST PIS 04/05/06: receita segregada hoje
+  simples_icms_st?:     boolean;
+  aliq_das_hoje?:       number;    // % do DAS no produto hoje
+  aliq_das_2027?:       number;
+  cst_pis?:             string;
 }
 
 // Campos fora de dados/totais (parametros, regime) chegam em todas as paginas.

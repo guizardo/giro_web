@@ -33,7 +33,18 @@ function Comparativo2027({ s, cld }: { s: GiroSimuladorCBSItem; cld: GiroProduto
   const debHoje  = cld.impostos_debitos.pis  + cld.impostos_debitos.cofins;
   const credHoje = cld.impostos_creditos.pis + cld.impostos_creditos.cofins;
   const pagHoje  = cld.impostos_a_pagar.pis  + cld.impostos_a_pagar.cofins;
-  const linhas: [string, string, string, boolean?][] = [
+  const simples = s.aliq_das_hoje != null;
+  // Simples puro: tudo pelo DAS (modelo diferente do CLD do regime normal)
+  const linhas: [string, string, string, boolean?][] = simples ? [
+    ['Tributo federal', 'PIS/COFINS no DAS', 'CBS+IBS no DAS'],
+    ['Situação', `CST ${s.cst_pis || '—'}${s.simples_monofasico ? ' · monofásico (segregado)' : ''}`,
+      s.simples_monofasico ? 'sem segregação' : 'sem mudança'],
+    ['Alíquota do DAS', pct(s.aliq_das_hoje ?? null), pct(s.aliq_das_2027 ?? null), (s.aliq_das_2027 ?? 0) > (s.aliq_das_hoje ?? 0) + 0.005],
+    ['Parte federal no DAS', fmt(s.pis_cofins_pagar), fmt(s.cbs_pagar)],
+    ['Custo (compra + fixos + DAS)', fmt(s.custo_cld_hoje), fmt(s.custo_cld_2027)],
+    ['Margem (preço atual)', pct(s.margem_hoje), pct(s.margem_2027), s.margem_2027 < s.margem_hoje - 0.005],
+    ['Preço', fmt(s.preco), s.preco_sugerido != null ? `${fmt(s.preco_sugerido)} (sugerido)` : '—'],
+  ] : [
     ['Tributo federal', 'PIS + COFINS', `CBS ${pct(s.aliquota_cbs_efetiva)}`],
     ['Situação', textoCstPisCofins(cld),
       s.sem_cclasstrib ? 'sem cClassTrib (000.001)' : `cClassTrib ${s.cclasstrib.slice(0, 3)}.${s.cclasstrib.slice(3)}`],
@@ -48,9 +59,11 @@ function Comparativo2027({ s, cld }: { s: GiroSimuladorCBSItem; cld: GiroProduto
   return (
     <div className="rounded-lg border border-indigo-200 p-3">
       <div className="flex items-center justify-between mb-2">
-        <p className="text-xs font-semibold text-indigo-700">Simulação CBS 2027</p>
+        <p className="text-xs font-semibold text-indigo-700">Simulação CBS 2027{simples && ' · Simples Nacional (DAS)'}</p>
         <p className="text-[10px] text-muted-foreground">
-          {s.sem_cclasstrib
+          {simples
+            ? 'cesta básica / redução da CBS não reduzem o DAS'
+            : s.sem_cclasstrib
             ? 'sem cClassTrib · alíquota cheia'
             : `cClassTrib ${s.cclasstrib.slice(0, 3)}.${s.cclasstrib.slice(3)} · ${s.tratamento_cbs}${s.cclasstrib_do_ncm ? ' (NCM)' : ''}`}
           {' · '}{benef[s.beneficio]}
@@ -170,7 +183,7 @@ export default function GiroProdutoCLDModal({ idDadospro, codFilial, onClose, si
               {simulacao && (
                 <>
                   <Comparativo2027 s={simulacao} cld={cld} />
-                  {Math.abs(simulacao.margem_hoje - cld.margem_cld) > 0.01 && (
+                  {simulacao.aliq_das_hoje == null && Math.abs(simulacao.margem_hoje - cld.margem_cld) > 0.01 && (
                     <p className="text-[11px] text-amber-700">
                       Margem de hoje no simulador ({fmt2(simulacao.margem_hoje)}%) difere do CLD ({fmt2(cld.margem_cld)}%):
                       os dados do produto mudaram desde o cálculo da lista.
